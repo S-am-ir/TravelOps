@@ -1,0 +1,28 @@
+[project]
+name = "lifeops-nepal"
+version = "0.1.0"
+description = "Personal AI Life Admin for Nepal — LangGraph + MCP"
+requires-python = ">=3.12"
+dependencies = [
+    "langgraph>=0.2.50",
+    "langchain-core>=0.3.25",
+    "langchain-mcp-adapters>=0.1.0",
+    "mcp>=1.2.0",                    # official FastMCP
+    "pydantic-settings>=2.7.0",
+    "pydantic>=2.10.0",
+    "httpx>=0.28.0",
+    "python-dotenv>=1.0.1",
+    "aiosqlite>=0.20.0",              # for checkpoints
+    "google-auth-oauthlib>=1.2.1",   # calendar later
+    "notion-client>=2.2.1",           # productivity
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.0",
+    "ruff>=0.9.0",
+    "black>=25.1.0",
+]
+
+[project.scripts]
+lifeops = "src.main:cli"
