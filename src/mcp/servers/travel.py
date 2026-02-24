@@ -76,7 +76,7 @@ async def get_weather(location: str, start_date: str, end_date: Optional[str] = 
     days = (end - start).days + 1
     days = max(1, min(days, 14)) # WeatherAPI free plan: up to 14 days
 
-    async with httpx.AsynClient(timeout=10) as c:
+    async with httpx.AsyncClient(timeout=10) as c:
         resp = await c.get(
             "https://api.weatherapi.com/v1/forecast.json",
             params={
@@ -142,7 +142,7 @@ async def search_flights(origin: str, destination: str, departure_date: str, adu
             offers.append(FlightOffer(
                 departure_time=segs[0]["departure"]["at"],
                 arrival_time=segs[-1]["arrival"]["at"],
-                airline_code=segs[0]["carrierCode"],
+                airline=segs[0]["carrierCode"],
                 flight_number=segs[0]["number"],
                 price_npr=float(o["price"]["total"]),
                 duration_minutes=_duration_minutes(itin.get("duration", "PT0M")),

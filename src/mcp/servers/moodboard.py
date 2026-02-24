@@ -48,7 +48,7 @@ async def generate_moodboard(prompt: str, count: int = 1) -> MoodboardResult:
             count=2
         )
     """
-    count = min(2, min(count, 3))
+    count = max(1, min(count, 2))
     url = f"https://fal.run/fal-ai/flux/schnell"
     headers = {
         "Authorization": f"Key {settings.fal_api_key.get_secret_value()}",
