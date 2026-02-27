@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     # External APIs
     groq_token: Optional[SecretStr] = None
+    google_api_key: Optional[SecretStr] = None
+    
     amadeus_client_id: Optional[SecretStr] = None
     amadeus_client_secret: Optional[SecretStr] = None
     weatherapi_key: Optional[str] = None
