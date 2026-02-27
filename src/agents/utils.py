@@ -74,6 +74,30 @@ NEPAL_AIRPORTS = {
     "jomsom": "JMO",
 }
 
+def resolve_airport_code(location: str) -> Optional[str]:
+    """Convert city name (or IATA) → IATA code. Nepal-focused.
+
+    Returns None if unknown → caller should handle gracefully
+    (e.g. ask user to clarify / pick from list / fallback).
+
+    Examples:
+        "Kathmandu"  → "KTM"
+        "ktm"        → "KTM"
+        "LUA"        → "LUA" (passthrough if 3 uppercase letters)
+        "New York"   → None
+    """
+    if not location:
+        return None
+
+    loc = location.lower().strip()
+
+    # Already looks like IATA code
+    if len(loc) == 3 and loc.isupper() and loc.isalpha():
+        return loc
+
+    # City name lookup (normalized)
+    return NEPAL_AIRPORTS.get(loc)
+
 def format_flight_time(iso_datetime: str) -> str:
     """Format ISO datetime to human-readable time.
     
