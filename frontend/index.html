@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LifeOps — Nepal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Mono:ital,wght@0,300;0,400;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;1,9..40,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <span class="logo-name">LifeOps</span>
+      <span class="logo-tag">NPL / v0.2</span>
+    </div>
+    <div class="header-right">
+      <span class="thread-display" id="threadDisplay">no thread</span>
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-label" id="statusLabel">offline</span>
+      <button class="clear-btn" onclick="clearThread()">new thread</button>
+    </div>
+  </header>
+
+  <!-- Messages -->
+  <div class="messages" id="messages">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-glyph">नेपाल</div>
+      <div class="empty-title">What can I help you with?</div>
+      <div class="suggestions">
+        <div class="suggestion" onclick="fillSuggestion(this)">
+          <span class="suggestion-icon">✈️</span>
+          <span class="suggestion-text">Plan a weekend trip to Pokhara under 15k NPR</span>
+        </div>
+        <div class="suggestion" onclick="fillSuggestion(this)">
+          <span class="suggestion-icon">🌤️</span>
+          <span class="suggestion-text">What's the weather in Kathmandu this weekend?</span>
+        </div>
+        <div class="suggestion" onclick="fillSuggestion(this)">
+          <span class="suggestion-icon">🔔</span>
+          <span class="suggestion-text">Remind me to call the bank tomorrow at 10am</span>
+        </div>
+        <div class="suggestion" onclick="fillSuggestion(this)">
+          <span class="suggestion-icon">🎨</span>
+          <span class="suggestion-text">Generate a moodboard for a Himalayan trek at dawn</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-wrap">
+      <textarea
+        id="input"
+        placeholder="Ask anything — travel, reminders, creative..."
+        rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Send">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="input-hint">Enter to send · Shift+Enter for new line</div>
+  </div>
+
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
