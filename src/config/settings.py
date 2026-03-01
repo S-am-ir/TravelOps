@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     mcp_comms_port: int = 8002
     mcp_moodboard_port: int = 8003
 
+    # Checkpointer
+    supabase_url: Optional[SecretStr] = None
+
     # External APIs
     groq_token: Optional[SecretStr] = None
     google_api_key: Optional[SecretStr] = None
