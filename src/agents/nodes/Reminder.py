@@ -6,7 +6,8 @@ from langchain_core.messages import SystemMessage, AIMessage
 from langgraph.types import interrupt
 from src.agents.state import AgentState, ReminderExtraction
 from src.mcp_internals.client import get_mcp_tools
-from src.config.settings import settings
+from src.model_api import invoke_with_fallback
+
 
 _scheduler = None
 
@@ -19,37 +20,13 @@ def _get_scheduler():
     return _scheduler
 
 
-# ── LLM ───────────────────────────────────────────────────────────────────
-# qwen3-32b: strong structured output, good at datetime parsing + context recall
-# Falls back to llama-3.3-70b-versatile if qwen3 fails
-
-def get_reminder_llm():
-    from langchain_groq import ChatGroq
-    return ChatGroq(
-        model="qwen/qwen3-32b",
-        temperature=0,
-        reasoning_effort="none",   # top-level param, NOT model_kwargs
-        api_key=settings.groq_token.get_secret_value() if settings.groq_token else None,
-    )
-
-def get_reminder_fallback_llm():
-    from langchain_groq import ChatGroq
-    return ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0,
-        api_key=settings.groq_token.get_secret_value() if settings.groq_token else None,
-    )
-
-
-# ── System Prompt ─────────────────────────────────────────────────────────
-
 REMINDER_SYSTEM = """You are extracting reminder details from a user's message.
 
 Today (Nepal time): {today}
 
 Extract:
 - reminder_message: concise Telegram-ready text of what to remind about.
-  If the user says "the trip plan you just made" or "send me the itinerary" or similar,
+  If the user says "the trip plan you just made" or "send me the itinerary",
   look back through the conversation history and summarise the key details
   (destination, dates, flights, hotel, budget, activities).
 - scheduled_for: ISO datetime (YYYY-MM-DDTHH:MM:SS) if a specific time was given,
@@ -60,22 +37,16 @@ Respond with valid JSON only.
 """
 
 
-# ── Tool result parser ────────────────────────────────────────────────────
-
 def _parse_tool_result(raw) -> dict:
-    """Normalize MCP tool result to a plain dict regardless of wrapper format."""
+    """Normalise MCP tool result to a plain dict regardless of wrapper format."""
     if isinstance(raw, dict):
         return raw
-
     if isinstance(raw, list):
-        text = ""
-        for block in raw:
-            if isinstance(block, dict) and block.get("type") == "text":
-                text += block.get("text", "")
-            elif isinstance(block, str):
-                text += block
-        raw = text.strip()
-
+        text = "".join(
+            b.get("text", "") if isinstance(b, dict) and b.get("type") == "text" else (b if isinstance(b, str) else "")
+            for b in raw
+        ).strip()
+        raw = text
     if isinstance(raw, str):
         try:
             parsed = json.loads(raw)
@@ -84,31 +55,22 @@ def _parse_tool_result(raw) -> dict:
         except json.JSONDecodeError:
             pass
         return {"status": "sent", "raw": raw}
-
     return {"status": "error", "error": f"Unexpected result type: {type(raw)}"}
 
-
-# ── Node ──────────────────────────────────────────────────────────────────
 
 async def reminder_agent_node(state: AgentState) -> dict:
     messages  = state.get("messages", [])
     now_iso   = datetime.now().strftime("%Y-%m-%d %H:%M")
     system_msg = SystemMessage(content=REMINDER_SYSTEM.format(today=now_iso))
 
-    extracted: ReminderExtraction | None = None
-    for name, llm_factory in [("qwen3-32b", get_reminder_llm), ("llama-3.3-70b (fallback)", get_reminder_fallback_llm)]:
-        try:
-            llm = llm_factory()
-            structured_llm = llm.with_structured_output(ReminderExtraction)
-            extracted = await structured_llm.ainvoke([system_msg] + messages)
-            print(f"[Reminder] Extracted via {name}: scheduled_for={extracted.scheduled_for}")
-            break
-        except Exception as e:
-            print(f"[Reminder] {name} failed: {e}, trying next...")
-            continue
-
-    if extracted is None:
-        err = "Couldn't parse your reminder. Please try again with a clearer time."
+    try:
+        extracted, model = await invoke_with_fallback(
+            [system_msg] + messages,
+            structured_schema=ReminderExtraction,
+        )
+        print(f"[Reminder] Extracted via {model}: scheduled_for={extracted.scheduled_for}")
+    except Exception as e:
+        err = f"Couldn't parse your reminder: {e}. Please try again with a clearer time."
         return {"messages": [AIMessage(content=err)], "final_response": err}
 
     reminder_text = extracted.reminder_message
@@ -122,9 +84,7 @@ async def reminder_agent_node(state: AgentState) -> dict:
         except ValueError:
             send_now = True
 
-    # ── Human-in-the-loop confirmation ───────────────────────────────────
-    # Pause and show the confirmation card in the UI before sending anything.
-    # The frontend reads interrupt_data.draft and interrupt_data.to to render the card.
+    # Human-in-the-loop: pause and show confirmation card before sending.
     confirmation = interrupt({
         "type":  "telegram_confirmation",
         "draft": reminder_text,
@@ -158,8 +118,6 @@ async def reminder_agent_node(state: AgentState) -> dict:
     }
 
 
-# ── Telegram helpers ──────────────────────────────────────────────────────
-
 async def _send_telegram_now(message: str) -> str:
     tools   = await get_mcp_tools(servers=["comms"])
     tg_tool = next((t for t in tools if t.name == "send_telegram_message"), None)
@@ -169,13 +127,10 @@ async def _send_telegram_now(message: str) -> str:
 
     try:
         raw         = await tg_tool.ainvoke({"body": message})
-        print(f"[Reminder] Raw tool result type={type(raw)}: {repr(raw)[:200]}")
         result_dict = _parse_tool_result(raw)
-
         if result_dict.get("status") == "sent":
             return f"✅ Reminder sent to your Telegram!\n\nMessage: {message}"
-        else:
-            return f"Failed to send reminder: {result_dict.get('error', 'Unknown error')}"
+        return f"Failed to send reminder: {result_dict.get('error', 'Unknown error')}"
     except Exception as e:
         return f"Telegram send failed: {e}"
 
