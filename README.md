@@ -8,7 +8,7 @@ Plans trips, searches live flights and hotels, checks weather, schedules Telegra
 
 ## Architecture
 
-![Architecture](architecture.svg)
+![Architecture](docs/architecture.svg)
 
 Three independent MCP servers handle tool access (travel APIs, Telegram, image generation). LangGraph manages state, routing, and the interrupt/resume flow for human-in-the-loop confirmations. The Postgres checkpointer (Supabase) persists conversation threads across restarts.
 
