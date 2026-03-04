@@ -2,8 +2,6 @@
 
 Three flows shown below — travel planning, Telegram confirmation, and the delivered message.
 
-> Moodboard generation is working but not included here yet — will add screenshots once the fal.ai setup is back on the primary device.
-
 ---
 
 ## 1. Travel planning
