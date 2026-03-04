@@ -1,48 +1,55 @@
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_core.tools import BaseTool
-from typing import List, Dict
+from typing import List, Dict, Optional
 from src.config.settings import settings
 
 MCP_SERVERS: Dict = {
     "travel": {
         "url": f"http://127.0.0.1:{settings.mcp_travel_port}/mcp",
-        "transport": "streamable_http"
+        "transport": "streamable_http",
     },
     "comms": {
         "url": f"http://127.0.0.1:{settings.mcp_comms_port}/mcp",
-        "transport": "streamable_http"
+        "transport": "streamable_http",
     },
     "moodboard": {
-        "url": f"http://127.0.0.1:{settings.mcp_moodbboard_port}/mcp",
-        "transport": "streamable_http"
-    } 
+        "url": f"http://127.0.0.1:{settings.mcp_moodboard_port}/mcp",
+        "transport": "streamable_http",
+    },
 }
 
-_client: MultiServerMCPClient | None = None
 _tools: List[BaseTool] = []
+_tool_server_map: Dict[str, str] = {}
 
-async def get_mcp_tools(servers: List[str] | None = None) -> List[BaseTool]:
-    global _client, _tools
+async def get_mcp_tools(servers: Optional[List[str]] = None) -> List[BaseTool]:
+    global _tools, _tool_server_map
+
     if not _tools:
-        target = {k: v for k, v in MCP_SERVERS.items() if servers is None or k in servers}
-        _client = MultiServerMCPClient(target)
-        await _client.__aenter__()
-        _tools = await _client.get_tools()
+        target = {k: v for k, v in MCP_SERVERS.items()}
+        client = MultiServerMCPClient(target)
+        all_tools = await client.get_tools()
+
+
+        _tool_server_map = {}
+        for server_key in MCP_SERVERS:
+            try:
+                single_client = MultiServerMCPClient({server_key: MCP_SERVERS[server_key]})
+                server_tools = await single_client.get_tools()
+                for t in server_tools:
+                    _tool_server_map[t.name] = server_key
+            except Exception as e:
+                print(f"[MCP] Warning: could not map tools for server '{server_key}': {e}")
+
+        _tools = all_tools
         print(f"[MCP] Loaded {len(_tools)} tools: {[t.name for t in _tools]}")
+        print(f"[MCP] Server map: {_tool_server_map}")
+
     if servers:
-        # Filter the requested server tools if a subset was asked for 
-        return [t for t in _tools if any(s in t.name for s in servers)] 
-    
+        return [t for t in _tools if _tool_server_map.get(t.name) in servers]
+
     return _tools
 
 async def reset_mcp_client():
-    global _client, _tools
-    if _client:
-        try:
-            await _client.__aexit__(None, None, None)
-        except Exception as e:
-            print(f"[MCP] Cleanup warning: {e}")
-    _client = None
+    global _tools
     _tools = []
     return await get_mcp_tools()
-

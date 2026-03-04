@@ -6,9 +6,6 @@ class AgentState(TypedDict, total=False):
     """Root Graph State"""
     # Conversation history - accumulated across turns via add_message
     messages: Annotated[list, add_messages]
-    
-    # Persistent user context (set once, carried across turns)
-    user_phone: Optional[str]
 
     # Routing - set by classfy_intent, re-evaluated each turn
     intent: Literal["travel_planning", "reminder", "creative", "unknown"]

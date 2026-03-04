@@ -204,7 +204,7 @@ function appendHITLCard(interruptData) {
       <div class="hitl-header">
         <div class="hitl-icon">📱</div>
         <div>
-          <div class="hitl-title">Send WhatsApp Message?</div>
+          <div class="hitl-title">Send Telegram Message?</div>
           <div class="hitl-to">to: ${escHtml(to)}</div>
         </div>
       </div>

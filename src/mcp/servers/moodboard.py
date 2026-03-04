@@ -10,7 +10,12 @@ from typing import List
 from src.config.settings import settings
 import httpx
 
-mcp = FastMCP("moodboard", json_response=True)
+mcp = FastMCP(
+    "moodboard",
+    host="127.0.0.1",
+    port=settings.mcp_moodboard_port,
+    json_response=True
+)
 
 class MoodboardImage(BaseModel):
     prompt_used: str
@@ -83,7 +88,10 @@ async def generate_moodboard(prompt: str, count: int = 1) -> MoodboardResult:
 
             except Exception as e:
                 return MoodboardResult(images=images, error=str(e))
-            
+    
+    return MoodboardResult(images=images)
+
 if __name__ == "__main__":
+
     print(f"[MCP Moodboard] running on port {settings.mcp_moodboard_port}")
     mcp.run(transport="streamable-http")

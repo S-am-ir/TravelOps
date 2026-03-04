@@ -9,76 +9,69 @@ from typing import Optional
 from src.config.settings import settings
 import httpx
 
-mcp = FastMCP("comms", json_response=True)
+mcp = FastMCP(
+    "comms",
+    host="127.0.0.1",
+    port=settings.mcp_comms_port,
+    json_response=True
+)
 
-class WhatsAppResult(BaseModel):
+class TelegramResult(BaseModel):
     status: str
     message_id: Optional[str] = None
     error: Optional[str] = None
 
 @mcp.tool()
-async def send_whatsapp_message(to_number: str, body: str) -> WhatsAppResult:
-    """Send an outbound WhatsApp message via the WhatsApp Cloud API.
-    
-    Use this to deliver reminder, summaries, alerts, or any
-    notification to the user's WhatsApp. This is outbound-only - it sends 
-    a message it does not receive or process replies.
-    
+async def send_telegram_message(body: str, chat_id: Optional[str] = None) -> TelegramResult:
+    """Send a message to the user via Telegram Bot API.
+
+    Use this to deliver reminders, travel summaries, alerts, or any
+    notification to the user's Telegram. Outbound only.
+
     Call this tool when:
-    - The user asks to be reminded about something (flight time, hotel check-in , whether alert)
-    - You have built a travel summary or itinerary and the user wants it sent to WhatsApp
-    - A scheduled or triggered notification needs to be delivered
-    
+    - The user asks to be reminded about something
+    - You have built a travel summary and the user wants it sent
+    - A scheduled notification needs to be delivered
+
     Args:
-        to_number: Recipient phone number in international format without the +.
-                   For Nepal numbers: 977 followed by the 10-digit number.
-                   E.g. "9779812345678" for +977 981-234-5678
-        body:      Message text to send. Plain text only, max 4096 characters.
-                   Be concise — this is a WhatsApp message, not an email.
+        body:    Message text to send. Markdown supported (bold, italic, code).
+                 Max 4096 characters.
+        chat_id: Override chat ID. If not provided, uses TELEGRAM_CHAT_ID from config.
 
     Returns:
-        WhatsAppResult with status "sent" and message_id on success,
-        or status "error" and an error description on failure.
-    
-    Example:
-        send_whatsapp_message(
-            to_number="9779812345678",
-            body="Reminder: Your flight KTM→PKR departs tomorrow at 07:30. Check-in opens at 05:30."
-        )
-    """ 
-    url = f"https://graph.facebook.com/v21.0/{settings.whatsapp_phone_number_id}/messages"
-    headers = {
-        "Authorization": f"Bearer {settings.whatsapp_access_token.get_secret_value()}",
-        "Content-Type": "application/json",
-    }
+        TelegramResult with status "sent" and message_id on success,
+        or status "error" with an error description on failure.
+    """
+    target_chat_id = chat_id or settings.telegram_chat_id
+    if not target_chat_id:
+        return TelegramResult(status="error", error="No chat_id provided and TELEGRAM_CHAT_ID not set in .env")
 
-    payload = {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": to_number,
-        "type": "text",
-        "text": {"body": body},
-    }
+    if not settings.telegram_bot_token:
+        return TelegramResult(status="error", error="TELEGRAM_BOT_TOKEN not set in .env")
+
+    url = f"https://api.telegram.org/bot{settings.telegram_bot_token.get_secret_value()}/sendMessage"
 
     async with httpx.AsyncClient(timeout=10) as client:
         try:
-            resp = await client.post(url, headers=headers, json=payload)
+            resp = await client.post(url, json={
+                "chat_id":    target_chat_id,
+                "text":       body,
+                "parse_mode": "Markdown",
+            })
             resp.raise_for_status()
             data = resp.json()
-            return WhatsAppResult(
+            return TelegramResult(
                 status="sent",
-                message_id=data["messages"][0]["id"],
+                message_id=str(data["result"]["message_id"]),
             )
         except httpx.HTTPStatusError as e:
-            return WhatsAppResult(
+            return TelegramResult(
                 status="error",
-                error=f"HTTP {e.response.status_code}: {e.response.text}"         
+                error=f"HTTP {e.response.status_code}: {e.response.text}",
             )
         except Exception as e:
-            return WhatsAppResult(
-                status="error",
-                error=str(e),
-            )
+            return TelegramResult(status="error", error=str(e))
+
         
 if __name__ == "__main__":
     print(f"[MCP Comms] running on port {settings.mcp_comms_port}")

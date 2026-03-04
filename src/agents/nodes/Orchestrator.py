@@ -1,27 +1,31 @@
 from typing import Literal
 from langchain_groq import ChatGroq
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_core.messages import SystemMessage, AIMessage
 from src.config.settings import settings
 from src.agents.state import AgentState, IntentClassification
 
 
-def get_classifier_llm():
-    """Gemini Flash for classification - flash and frugal"""
-    if settings.google_api_key:
-        return ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
-            google_api_key=settings.google_api_key.get_secret_value(),
-            temperature=0,
-        )
-    # Fallback to Groq if Google key not set
+# ── LLM ───────────────────────────────────────────────────────────────────
+# qwen3-32b: strong instruction-following, reliable structured output, 1K RPD
+# Falls back to llama-3.3-70b-versatile if qwen3 fails for any reason
+
+def get_primary_llm():
+    return ChatGroq(
+        model="qwen/qwen3-32b",
+        temperature=0,
+        reasoning_effort="none",   # top-level param, NOT model_kwargs
+        api_key=settings.groq_token.get_secret_value() if settings.groq_token else None,
+    )
+
+def get_fallback_llm():
     return ChatGroq(
         model="llama-3.3-70b-versatile",
         temperature=0,
         api_key=settings.groq_token.get_secret_value() if settings.groq_token else None,
     )
 
-# System Prompt
+
+# ── System Prompt ─────────────────────────────────────────────────────────
 
 CLASSIFIER_SYSTEM = """You are an intent classifier for a personal life admin AI.
 
@@ -32,9 +36,14 @@ travel_planning — planning or researching trips, flights, hotels, weather, des
   Examples: "Plan a trip to Pokhara", "Flights KTM to DEL next Friday",
             "What should I do in Kathmandu for 2 days?", "Is it rainy in Pokhara in March?"
 
-reminder — user wants to be reminded, notified, or alerted at some time via WhatsApp.
+reminder — user wants to be reminded, notified, or alerted. This includes asking to
+  send or share information via Telegram, WhatsApp, or any messaging platform.
+  CRITICAL: If the user says things like "send me this on Telegram", "notify me via WhatsApp",
+  "message me the plan", "send this to me", or "remind me of this" — even immediately after
+  a travel conversation — this is ALWAYS a reminder, NOT travel_planning.
   Examples: "Remind me to call mom at 5pm", "Alert me tomorrow morning",
-            "Send me a message in 2 hours"
+            "Send me a message in 2 hours", "Send me the trip plan on Telegram",
+            "Notify me via WhatsApp", "Message me the itinerary"
 
 creative — generating images, moodboards, visual concepts, aesthetic exploration.
   Examples: "Generate a moodboard for a mountain trip", "Create an image of Pokhara at sunset"
@@ -42,8 +51,11 @@ creative — generating images, moodboards, visual concepts, aesthetic explorati
 unknown — anything that doesn't fit the above, or is a greeting/meta question.
   Examples: "Hi", "What can you do?", "Thanks"
 
-IMPORTANT: Look at the FULL conversation history for context. A short follow-up like
-"yes go ahead" or "what about hotels?" belongs to the same intent as the prior messages.
+IMPORTANT: Look at the FULL conversation history for context.
+- A short follow-up like "yes go ahead" or "what about hotels?" belongs to the same
+  intent as the prior messages (travel_planning in that context).
+- BUT "send me that on Telegram" or "notify me" after any conversation = reminder.
+  The delivery/notification request always overrides the previous context.
 
 Respond with valid JSON only:
 {
@@ -53,51 +65,61 @@ Respond with valid JSON only:
 }
 """
 
-async def classify_intent_node(state: AgentState) -> dict:
-    """Classify user intent from latest message + conversation context."""
+# ── Node ──────────────────────────────────────────────────────────────────
 
+async def classify_intent_node(state: AgentState) -> dict:
     messages = state.get("messages", [])
     if not messages:
         return {"intent": "unknown"}
-    
-    llm = get_classifier_llm()
-    structured_llm = llm.with_structured_output(IntentClassification)
 
-    try:
-        result: IntentClassification = await structured_llm.ainvoke(
-            [SystemMessage(content=CLASSIFIER_SYSTEM)] + messages
-        )
-        intent = result.intent
-        print(f"[Orchestrator] Intent: {intent} ({result.confidence:.0%})")
-    except Exception as e:
-        print(f"[Orchestrator] Classification failed: {e}")
-        intent = "unknown"
-    
-    return {"intent": intent}
+    llms_to_try = [
+        ("qwen3-32b", get_primary_llm),
+        ("llama-3.3-70b (fallback)", get_fallback_llm),
+    ]
 
-# Router
+    last_error = None
+    for name, llm_factory in llms_to_try:
+        try:
+            llm = llm_factory()
+            structured_llm = llm.with_structured_output(IntentClassification)
+            result: IntentClassification = await structured_llm.ainvoke(
+                [SystemMessage(content=CLASSIFIER_SYSTEM)] + messages
+            )
+            print(f"[Orchestrator] Intent: {result.intent} ({result.confidence:.0%}) via {name} — {result.reasoning}")
+            return {"intent": result.intent}
+        except Exception as e:
+            last_error = e
+            print(f"[Orchestrator] {name} classification failed: {e}, trying next...")
+            continue
+
+    print(f"[Orchestrator] All classifiers failed: {last_error}")
+    return {"intent": "unknown"}
+
+
+# ── Router ────────────────────────────────────────────────────────────────
+
 def route_to_agent(state: AgentState) -> Literal["travel_agent", "reminder_agent", "creative_agent", "unknown_handler"]:
     """Conditional edge: route based on classified intent"""
     return {
         "travel_planning": "travel_agent",
-        "reminder": "reminder_agent",
-        "creative": "creative_agent",
-        "unknown": "unknown_handler"
+        "reminder":        "reminder_agent",
+        "creative":        "creative_agent",
+        "unknown":         "unknown_handler",
     }.get(state.get("intent", "unknown"), "unknown_handler")
 
-# Unknown handler
+
+# ── Unknown handler ───────────────────────────────────────────────────────
+
 async def unknown_handler_node(state: AgentState) -> dict:
     """Friendly fallback for unrecognized queries"""
-
     response = (
         "I'm your personal life admin assistant. Here's what I can help with:\n\n"
         "✈️  **Travel** — flights, hotels, weather, destination tips, itineraries\n"
-        "🔔  **Reminders** — send yourself a WhatsApp reminder at any time\n"
+        "🔔  **Reminders** — send yourself a Telegram reminder at any time\n"
         "🎨  **Creative** — AI moodboards and image generation\n\n"
         "What would you like to do?"
     )
-
     return {
-        "message": [AIMessage(content=response)],
+        "messages": [AIMessage(content=response)],
         "final_response": response,
     }

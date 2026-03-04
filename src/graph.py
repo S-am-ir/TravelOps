@@ -82,9 +82,9 @@ async def create_agent():
             checkpointer = await create_postgres_checkpointer()
         except Exception as e:
             print(f"[Graph] Postgres checkpointer failed {str(e)} failling back to memory")
-            checkpointer = create_memory_checkpointer()
+            checkpointer = await create_memory_checkpointer()
     else:
-        checkpointer = create_memory_checkpointer()
+        checkpointer = await create_memory_checkpointer()
 
     return build_graph(checkpointer=checkpointer)
 

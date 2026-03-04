@@ -30,7 +30,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    all_origins=["*"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,16 +53,31 @@ class ConversationHistory(BaseModel):
     messages: list[dict]
 
 # Helper
+def _normalize_content(content) -> str:
+    """Gemini 2.5-flash returns content as a list of blocks, not a plain string."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block["text"])
+            elif isinstance(block, str):
+                parts.append(block)
+        return "".join(parts)
+    return str(content)
+
+
 def _extract_response(state: dict) -> str:
     """Pull the last AI message from state, fallback to final response field"""
     final = state.get("final_response")
     if final:
-        return final
+        return _normalize_content(final)
     
     messages = state.get("messages", [])
     for msg in reversed(messages):
         if isinstance(msg, AIMessage) and msg.content:
-            return msg.content
+            return _normalize_content(msg.content)
         
     return "I've processed your request."
 
@@ -93,7 +108,7 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=503, detail="Agent not ready")
     
     thread_id = request.thread_id or str(uuid4())
-    config = {"configuration": {"thread_id": thread_id}}
+    config = {"configurable": {"thread_id": thread_id}}
 
     # Check if the graph is currently paused at an interrupt for this thread
     try:
@@ -104,9 +119,17 @@ async def chat(request: ChatRequest):
 
     try:
         if is_interrupted:
-            # Resume from where it paused - pass user message as the resume value
+            # Resume from where it paused.
+            # Frontend sends JSON.stringify({confirmed:true/false}) as message string,
+            # so parse it back to dict so interrupt() receives {"confirmed": True}
+            # not the raw string '{"confirmed":true}' which would fail the bool check.
+            import json as _json
+            try:
+                resume_value = _json.loads(request.message)
+            except Exception:
+                resume_value = request.message
             result = await _agent.ainvoke(
-                Command(resume=request.message),
+                Command(resume=resume_value),
                 config=config,
             )
         else:
@@ -176,3 +199,13 @@ async def clear_thread(thread_id: str):
 @app.get("/health")
 async def health():
     return {"status": "ok", "agent_ready": _agent is not None}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    print("[DEBUG] Starting FastAPI server...")
+    try:
+        uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    except Exception as e:
+        print("[CRITICAL] Failed to start server:", str(e))
+        raise
