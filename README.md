@@ -32,7 +32,7 @@ Three independent MCP servers handle tool access (travel APIs, Telegram, image g
 | LLM | qwen3-32b on Groq | Fast, reliable tool calling, good structured output |
 | LLM fallback | llama-3.3-70b on Groq | Text-only fallback if primary fails |
 | Tool protocol | MCP (FastMCP) | Each server runs independently, clean separation |
-| Flight search | Sky-Scrapper (RapidAPI) | Skyscanner data without official API access |
+| Flight search | Sky-Scrapper (RapidAPI) | Skyscanner data with official API access |
 | Hotel search | Booking.com15 (RapidAPI) | Booking.com wrapper via same RapidAPI key |
 | Weather | WeatherAPI | Free tier covers Nepal forecasts cleanly |
 | Notifications | Telegram Bot API | Simple outbound delivery |
