@@ -1,4 +1,4 @@
-# TravelOps &nbsp;·&nbsp;
+# TravelOps
 
 Personal AI travel assistant for Nepal — built on LangGraph, MCP, and Groq.
 
