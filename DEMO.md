@@ -3,8 +3,13 @@
 Three flows shown below — travel planning, Telegram confirmation, and the delivered message.
 
 ---
-
 ## 1. Travel planning
+
+![Dashboard](docs/Dashboard.png)
+
+---
+
+## 2. Travel planning
 
 ![Travel planning response](docs/travel_response.png)
 
@@ -21,7 +26,7 @@ What's happening under the hood:
 
 ---
 
-## 2. Human-in-the-loop confirmation
+## 3. Human-in-the-loop confirmation
 
 ![HITL confirmation card](docs/hitl_confirmation.png)
 
@@ -33,7 +38,7 @@ This applies to both the Reminder agent (scheduled or immediate sends) and the T
 
 ---
 
-## 3. Telegram delivery
+## 4. Telegram delivery
 
 ![Telegram message](docs/telegram_message.png)
 
