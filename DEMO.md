@@ -3,7 +3,7 @@
 Three flows shown below — travel planning, Telegram confirmation, and the delivered message.
 
 ---
-## 1. Travel planning
+## 1. Dashboard
 
 ![Dashboard](docs/Dashboard.png)
 
