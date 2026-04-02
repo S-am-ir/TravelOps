@@ -44,24 +44,27 @@ async def _load_tools():
     global _tools, _tool_server_map
 
     mcp_servers = _build_mcp_servers()
-
-    target = {k: v for k, v in mcp_servers.items()}
-    client = MultiServerMCPClient(target)
-    all_tools = await client.get_tools()
-
+    all_tools = []
     _tool_server_map = {}
-    for server_key in mcp_servers:
+
+    for server_key, server_config in mcp_servers.items():
         try:
-            single_client = MultiServerMCPClient({server_key: mcp_servers[server_key]})
+            # Load tools from each server individually to prevent TaskGroup exceptions
+            # from taking down the entire MultiServer client
+            single_client = MultiServerMCPClient({server_key: server_config})
             server_tools = await single_client.get_tools()
+            all_tools.extend(server_tools)
             for t in server_tools:
                 _tool_server_map[t.name] = server_key
-        except Exception as e:
-            print(f"[MCP] Warning: could not map tools for server '{server_key}': {e}")
+        except BaseException as e:
+            import traceback
+            err_details = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            print(f"[MCP] Critical Warning: loaded failed for '{server_key}':\n{err_details}")
 
     _tools = all_tools
     print(f"[MCP] Loaded {len(_tools)} tools: {[t.name for t in _tools]}")
     print(f"[MCP] Server map: {_tool_server_map}")
+
 
 
 async def reset_mcp_client():

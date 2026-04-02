@@ -278,9 +278,15 @@ async def chat(
             }
             result = await _agent.ainvoke(input_state, config=config)
 
-    except Exception as e:
-        print(f"[API] Agent error: {e}")
-        raise HTTPException(status_code=500, detail=f"Agent error: {e}")
+    except BaseException as e:
+        import traceback
+        error_details = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+        print(f"[API] Agent error: {error_details}")
+        
+        err_msg = str(e)
+        if hasattr(e, "exceptions") and e.exceptions:
+            err_msg = f"{e}: {e.exceptions[0]}"
+        raise HTTPException(status_code=500, detail=f"Agent error: {err_msg}")
 
     # Check if we ended at a new interrupt
     try:
@@ -371,8 +377,15 @@ async def chat_stream(
                     }
                     result = await _agent.ainvoke(input_state, config=config)
                 await token_queue.put(("__DONE__", result))
-            except Exception as e:
-                await token_queue.put(("__ERROR__", str(e)))
+            except BaseException as e:
+                import traceback
+                error_details = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                print(f"[API] Error in run_agent: {error_details}")
+                # Try to extract the first sub-exception if it's an ExceptionGroup
+                err_msg = str(e)
+                if hasattr(e, "exceptions") and e.exceptions:
+                    err_msg = f"{e}: {e.exceptions[0]}"
+                await token_queue.put(("__ERROR__", err_msg))
             finally:
                 token_callback.set(None)
 
