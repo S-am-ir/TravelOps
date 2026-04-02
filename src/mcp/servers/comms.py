@@ -84,5 +84,10 @@ async def send_telegram_message(
 
 
 if __name__ == "__main__":
-    print(f"[MCP Comms] running on port {settings.mcp_comms_port}")
-    mcp.run(transport="streamable-http")
+    import uvicorn
+
+    host = settings.mcp_host
+    port = settings.mcp_comms_port
+    print(f"[MCP Comms] starting on {host}:{port}")
+    app = mcp.http_app("/mcp")
+    uvicorn.run(app, host=host, port=port)

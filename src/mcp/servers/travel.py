@@ -561,5 +561,10 @@ async def search_hotels(
 
 
 if __name__ == "__main__":
-    print(f"[MCP Travel] running on port {settings.mcp_travel_port}")
-    mcp.run(transport="streamable-http")
+    import uvicorn
+
+    host = settings.mcp_host
+    port = settings.mcp_travel_port
+    print(f"[MCP Travel] starting on {host}:{port}")
+    app = mcp.http_app("/mcp")
+    uvicorn.run(app, host=host, port=port)
