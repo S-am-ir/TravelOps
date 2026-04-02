@@ -21,14 +21,10 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
-      - key: MCP_HOST
-        value: "127.0.0.1"
-      - key: MCP_TRAVEL_PORT
-        value: "8001"
-      - key: MCP_COMMS_PORT
-        value: "8002"
-      - key: MCP_SEARCH_PORT
-        value: "8004"
       - key: FRONTEND_URL
         sync: false
+      - key: MCP_DIRECT
+        value: "true"
+      - key: PYTHONUNBUFFERED
+        value: "1"
     autoDeploy: false

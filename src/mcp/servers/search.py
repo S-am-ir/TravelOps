@@ -228,10 +228,5 @@ async def web_search_multi(
 
 
 if __name__ == "__main__":
-    import uvicorn
-
-    host = settings.mcp_host
-    port = settings.mcp_search_port
-    print(f"[MCP Search] starting on {host}:{port}")
-    app = mcp.http_app("/mcp")
-    uvicorn.run(app, host=host, port=port)
+    print(f"[MCP Search] running on {settings.mcp_host}:{settings.mcp_search_port}")
+    mcp.run(transport="streamable-http")

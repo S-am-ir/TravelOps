@@ -1,5 +1,7 @@
 FROM python:3.11-slim AS base
 
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # System deps for psycopg (Postgres) and bcrypt
