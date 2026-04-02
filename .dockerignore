@@ -27,10 +27,10 @@ Thumbs.db
 htmlcov
 .tox
 
-# Docker (avoid recursive)
-Dockerfile
-docker-compose*.yml
-.dockerignore
+# Docker (metadata allowed in build context)
+# Dockerfile
+# docker-compose*.yml
+# .dockerignore
 
 # Docs images (not needed at runtime)
 docs/*.png
