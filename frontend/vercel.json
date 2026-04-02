@@ -1,0 +1,5 @@
+{
+  "version": 2,
+  "buildCommand": "echo \"window.__API_BASE__ = '$BACKEND_URL';\" > config.js",
+  "outputDirectory": "."
+}
