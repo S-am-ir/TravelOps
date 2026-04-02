@@ -81,8 +81,15 @@ _pg_pool = None  # Keep connection pool alive for app lifetime
 
 async def create_postgres_checkpointer():
     """
-    Async Postgres checkpointer backed by Supabase.
+    Async Postgres checkpointer backed by Neon/Supabase.
     Manages connection pool lifetime so it stays alive across requests.
+
+    Key settings to handle Neon/Supabase SSL timeouts:
+    - check: ping the DB before lending a connection to detect dead ones
+    - max_idle=60: close connections idle for >60s (before Neon/Supabase kills them)
+    - max_lifetime=300: never keep a connection longer than 5 minutes
+    - TCP keepalives: periodically ping the OS-level connection
+    - reconnect_timeout=5: reconnect quickly if a connection dies
     """
     global _pg_pool
     from psycopg_pool import AsyncConnectionPool
@@ -90,8 +97,26 @@ async def create_postgres_checkpointer():
 
     conn_string = settings.supabase_url.get_secret_value()
 
-    # Create and open a connection pool (stays alive for app lifetime)
-    _pg_pool = AsyncConnectionPool(conn_string, min_size=1, max_size=10, open=False)
+    async def _check_connection(conn):
+        """Verify the connection is still alive before lending it from the pool."""
+        await conn.execute("SELECT 1")
+
+    _pg_pool = AsyncConnectionPool(
+        conn_string,
+        min_size=1,
+        max_size=10,
+        open=False,
+        max_idle=60,        # Close connections idle for >60 seconds
+        max_lifetime=300,   # Recycle every connection after 5 minutes
+        reconnect_timeout=5,
+        check=_check_connection,
+        kwargs={
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+        },
+    )
     await _pg_pool.open()
 
     # Create checkpointer from the pool
@@ -114,8 +139,9 @@ async def create_postgres_checkpointer():
     except Exception as setup_err:
         print(f"[Graph] Postgres setup warning (non-fatal): {setup_err}")
 
-    print("[Graph] Postgres checkpointer ready ")
+    print("[Graph] Postgres checkpointer ready (pool optimized for Neon/Supabase)")
     return checkpointer
+
 
 
 async def create_memory_checkpointer():
