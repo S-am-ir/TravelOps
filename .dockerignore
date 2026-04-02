@@ -1,0 +1,43 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.venv
+venv
+env
+
+# IDE
+.vscode
+.idea
+.cursorignore
+.cursorindexingignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / coverage
+.pytest_cache
+.coverage
+htmlcov
+.tox
+
+# Docker (avoid recursive)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Docs images (not needed at runtime)
+docs/*.png
+docs/*.svg
+DEMO.md
+README.md
+
+# DB files
+*.db
+checkpoints/

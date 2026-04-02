@@ -1,0 +1,279 @@
+"""
+Travel agent node.
+
+Primary:  OpenRouter models (no TPM limit, 50 req/day free)
+Fallback: Groq (openai/gpt-oss-120b, qwen/qwen3-32b)
+"""
+
+import json
+import asyncio
+from contextvars import ContextVar
+from datetime import date
+from typing import Optional, Callable, Awaitable
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
+from langgraph.types import interrupt
+from src.agents.state import AgentState
+from src.mcp.client import get_mcp_tools
+from src.model_api import get_primary_llm, get_fallback1_llm, get_fallback2_llm
+
+# Contextvar for token streaming callback — set by API layer before invoking graph
+token_callback: ContextVar[Optional[Callable[[str], Awaitable[None]]]] = ContextVar(
+    "token_callback", default=None
+)
+
+
+TRAVEL_SYSTEM = """You are a knowledgeable, conversational travel assistant.
+Today is {today}.
+
+━━━ TOOLS ━━━
+get_weather(city)             — weather forecast for any city
+search_flights(origin, dest, date) — live flight search (IATA codes: KTM, PKR, BIR, etc.)
+search_hotels(city, checkin, checkout) — live hotel/accommodation search
+web_search(query, max_results)    — real-time web search for anything: buses, transport, places,
+  activities, tips, local food, routes, budget options, camping, guesthouses, currency rates, etc.
+web_search_multi(queries, max_results) — search multiple topics at once
+
+━━━ HOW TO DECIDE TOOLS ━━━
+- Planning a trip? → ALWAYS call get_weather for the destination
+- Need flights? → call search_flights
+- Need hotels/hostels? → call search_hotels
+- Need buses, micro, shared transport? → call web_search
+- Need places to visit, things to do, tips? → call web_search
+- Need budget/cheap options? → call web_search (bus routes, cheap stays, local transport)
+- Need currency conversion? → call web_search ("USD to NPR rate today")
+- Flight/hotel search failed or no results? → fall back to web_search for alternatives
+
+Fire MULTIPLE tools in ONE response whenever possible. The user shouldn't wait for
+separate rounds when you can parallelize.
+
+━━━ DATES ━━━
+Today's date is provided above. Calculate relative dates:
+- "this weekend" = upcoming Sat + Sun from today
+- "tomorrow" = today + 1
+- "next Friday" = the next Friday
+NEVER guess today's date.
+
+━━━ RESPONSE QUALITY ━━━
+- Use REAL data from tools. Never invent prices, names, or locations.
+- Be specific: exact bus park names, departure times, entry fees, URLs.
+- If a tool returns data, reference it directly. If it fails, say so and give best-effort estimates.
+- Budget plans: show itemized costs. Suggest cheaper alternatives when budget is tight.
+- Convert currencies if needed (search for current rates, don't hardcode).
+- Never say "you could search for..." — YOU search using tools.
+
+━━━ SENDING ━━━
+Do NOT send anything unless the user explicitly asks to send/notify/email.
+If they ask to send, let the Reminder agent handle it.
+"""
+
+
+async def _execute_tool(tc: dict, tool_map: dict) -> ToolMessage:
+    name = tc["name"]
+    args = tc["args"]
+    call_id = tc["id"]
+
+    if name == "send_telegram_message":
+        draft = args.get("body", "")
+        confirmation = interrupt(
+            {
+                "type": "telegram_confirmation",
+                "draft": draft,
+                "to": "your Telegram",
+                "prompt": f"Send this to your Telegram?\n\n{draft}\n\nReply yes/no.",
+            }
+        )
+        confirmed = (
+            isinstance(confirmation, dict) and confirmation.get("confirmed")
+        ) or (
+            isinstance(confirmation, str)
+            and confirmation.strip().lower() in ("yes", "y", "confirm", "send")
+        )
+        if not confirmed:
+            return ToolMessage(
+                content="Cancelled. Message was NOT sent.", tool_call_id=call_id
+            )
+
+    tool = tool_map.get(name)
+    if not tool:
+        return ToolMessage(
+            content=f"Tool '{name}' not available. Known: {list(tool_map.keys())}",
+            tool_call_id=call_id,
+        )
+
+    try:
+        result = await tool.ainvoke(args)
+        content = json.dumps(result) if not isinstance(result, str) else result
+        print(f"[Travel] tool OK: {name} → {len(content)} chars")
+    except Exception as e:
+        content = f"Tool error ({name}): {e}"
+        print(f"[Travel] tool FAIL: {name}: {e}")
+
+    return ToolMessage(content=content, tool_call_id=call_id)
+
+
+async def _react_loop(react_tools, tool_map, system_msg, conversation):
+    """ReAct loop with streaming, retry logic, and model fallback."""
+    accumulated = []
+    MAX_ITER = 3  # 1-2 tool rounds + 1 final response
+    cb = token_callback.get()
+    # Groq primary (no retry), Groq fallback (no retry), OpenRouter last resort (retry)
+    model_factories = [get_primary_llm, get_fallback1_llm, get_fallback2_llm]
+    retry_last_only = {2}  # only retry on OpenRouter (index 2)
+
+    for i in range(MAX_ITER):
+        response = None
+        for factory_idx, factory in enumerate(model_factories):
+            should_retry = factory_idx in retry_last_only
+            max_retries = 3 if should_retry else 1
+            for retry in range(max_retries):
+                try:
+                    llm = factory(temperature=0.6).bind_tools(react_tools)
+                    parts = []
+                    async for chunk in llm.astream(
+                        [system_msg] + conversation + accumulated
+                    ):
+                        parts.append(chunk)
+                        if cb and chunk.content:
+                            await cb(chunk.content)
+                    response = parts[0]
+                    for part in parts[1:]:
+                        response = response + part
+                    break
+                except Exception as e:
+                    err_str = str(e)
+                    is_rate_limit = any(
+                        k in err_str.lower() for k in ["429", "rate", "limit", "quota"]
+                    )
+                    if is_rate_limit and should_retry and retry < max_retries - 1:
+                        wait = 2 ** (retry + 1)
+                        print(
+                            f"[Travel] iter {i + 1} model {factory_idx} rate-limited, retry {retry + 1}/{max_retries} in {wait}s"
+                        )
+                        await asyncio.sleep(wait)
+                    else:
+                        print(
+                            f"[Travel] iter {i + 1} model {factory_idx} failed: {type(e).__name__}: {str(e)[:100]}"
+                        )
+                        break
+            if response is not None:
+                break
+        if response is None:
+            print(f"[Travel] all models failed iter {i + 1}, stopping")
+            return accumulated, False
+
+        accumulated.append(response)
+        print(
+            f"[Travel] iter {i + 1}: {len(response.tool_calls)} tool_calls, has_content={bool(response.content)}"
+        )
+
+        if not response.tool_calls:
+            return accumulated, True
+
+        tool_names = [tc["name"] for tc in response.tool_calls]
+        if cb:
+            await cb(f"\n*Running: {', '.join(tool_names)}...*\n")
+
+        results = await asyncio.gather(
+            *[_execute_tool(tc, tool_map) for tc in response.tool_calls],
+            return_exceptions=True,
+        )
+        for r in results:
+            if isinstance(r, Exception):
+                print(f"[Travel] gather error: {r}")
+            else:
+                accumulated.append(r)
+
+    # Force text response if max iterations reached
+    if not _last_ai_text(accumulated):
+        print("[Travel] max iterations, forcing text response")
+        try:
+            force_llm = model_factories[0](temperature=0.3)
+            force_msgs = (
+                [system_msg]
+                + conversation
+                + accumulated
+                + [
+                    SystemMessage(
+                        content="Respond now using all tool data above. No more tools."
+                    )
+                ]
+            )
+            force_resp = await force_llm.ainvoke(force_msgs)
+            accumulated.append(force_resp)
+        except Exception as e:
+            print(f"[Travel] forced response failed: {e}")
+
+    return accumulated, True
+
+
+async def _fallback_response(conversation):
+    """Text-only fallback when all tool-calling models fail."""
+    for factory in [get_fallback1_llm, get_fallback2_llm]:
+        try:
+            llm = factory()
+            prompt = (
+                "You are a travel assistant. The user asked a travel question but live tools are unavailable. "
+                "Give a helpful answer based on your knowledge. Be upfront that info may not be current.\n\n"
+                "User: " + (conversation[-1].content if conversation else "")
+            )
+            r = await llm.ainvoke(prompt)
+            text = _extract_text(r.content)
+            if text:
+                return text
+        except Exception as e:
+            print(f"[Travel] fallback failed: {str(e)[:80]}")
+            continue
+    return "I'm having trouble connecting right now. Please try again in a moment."
+
+
+async def travel_agent_node(state: AgentState) -> dict:
+    all_tools = await get_mcp_tools()
+    react_tools = [t for t in all_tools if t.name != "send_telegram_message"]
+    tool_map = {t.name: t for t in all_tools}
+
+    system_msg = SystemMessage(
+        content=TRAVEL_SYSTEM.format(today=date.today().isoformat())
+    )
+    conversation = list(state.get("messages", []))
+    # Filter: only keep HumanMessage and AIMessage (skip ToolMessages from previous turns)
+    conversation = [
+        m
+        for m in conversation
+        if isinstance(m, (HumanMessage, AIMessage)) and m.content
+    ]
+    conversation = conversation[-4:] if len(conversation) > 4 else conversation
+
+    msgs, ok = await _react_loop(react_tools, tool_map, system_msg, conversation)
+    final = _last_ai_text(msgs)
+
+    if ok and final:
+        return {"messages": msgs, "final_response": final}
+
+    print(f"[Travel] react loop done (ok={ok}), trying fallback")
+    text = await _fallback_response(conversation + msgs)
+    return {"messages": [AIMessage(content=text)], "final_response": text}
+
+
+def _extract_text(content) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            (
+                b.get("text", "")
+                if isinstance(b, dict)
+                else (b if isinstance(b, str) else "")
+            )
+            for b in content
+        )
+    return str(content)
+
+
+def _last_ai_text(messages: list) -> str | None:
+    """Return the content of the last AIMessage that has text."""
+    for msg in reversed(messages):
+        if isinstance(msg, AIMessage) and msg.content:
+            text = _extract_text(msg.content)
+            if text.strip():
+                return text
+    return None

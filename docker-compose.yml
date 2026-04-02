@@ -1,0 +1,93 @@
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: travel
+      POSTGRES_PASSWORD: travel_dev
+      POSTGRES_DB: travel_planner
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U travel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Main API Server ─────────────────────────────────────────────────
+  api:
+    build: .
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      &common-env
+      SUPABASE_URL: postgresql://travel:travel_dev@postgres:5432/travel_planner
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GROQ_TOKEN: ${GROQ_TOKEN:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      RAPIDAPI_KEY: ${RAPIDAPI_KEY:-}
+      WEATHERAPI_KEY: ${WEATHERAPI_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      MCP_HOST: "0.0.0.0"
+      MCP_TRAVEL_HOST: mcp-travel
+      MCP_COMMS_HOST: mcp-comms
+      MCP_SEARCH_HOST: mcp-search
+      MCP_TRAVEL_PORT: "8001"
+      MCP_COMMS_PORT: "8002"
+      MCP_SEARCH_PORT: "8004"
+    volumes:
+      - ./src:/app/src
+      - ./frontend:/app/frontend
+      - checkpoints:/app/checkpoints
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp-travel:
+        condition: service_started
+      mcp-comms:
+        condition: service_started
+      mcp-search:
+        condition: service_started
+
+  # ── MCP Travel Server (flights, weather, hotels) ────────────────────
+  mcp-travel:
+    build: .
+    command: python src/mcp/servers/travel.py
+    ports:
+      - "8001:8001"
+    environment:
+      <<: *common-env
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── MCP Comms Server (email) ────────────────────────────────────────
+  mcp-comms:
+    build: .
+    command: python src/mcp/servers/comms.py
+    ports:
+      - "8002:8002"
+    environment:
+      <<: *common-env
+    volumes:
+      - ./src:/app/src
+
+  # ── MCP Search Server (Tavily) ──────────────────────────────────────
+  mcp-search:
+    build: .
+    command: python src/mcp/servers/search.py
+    ports:
+      - "8004:8004"
+    environment:
+      <<: *common-env
+    volumes:
+      - ./src:/app/src
+
+volumes:
+  pgdata:
+  checkpoints:

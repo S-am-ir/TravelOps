@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Travel Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<!-- ── Toast Container ──────────────────────────────────────────────── -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ── Auth Screen ─────────────────────────────────────────────────── -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="var(--accent)"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+      <span class="logo-name">Travel Planner</span>
+    </div>
+    <div class="auth-title" id="authTitle">Sign in</div>
+    <div class="auth-subtitle" id="authSubtitle">Welcome back — your conversation will be restored.</div>
+
+    <form id="authForm" onsubmit="handleAuth(event)">
+      <div class="auth-field">
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" required autocomplete="email">
+      </div>
+      <div class="auth-field">
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" placeholder="Min 6 characters" required minlength="6" autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="authError"></div>
+      <button type="submit" class="auth-btn" id="authBtn">Sign in</button>
+    </form>
+
+    <div class="auth-toggle">
+      <span id="authToggleText">Don't have an account?</span>
+      <a href="#" id="authToggleLink" onclick="toggleAuthMode(event)">Create one</a>
+    </div>
+
+    <div class="auth-skip">
+      <a href="#" onclick="skipAuth(event)">Continue without account</a>
+      <span class="auth-skip-note">Conversation won't persist across sessions.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main App ────────────────────────────────────────────────────── -->
+<div class="app" id="app" style="display:none;">
+
+  <!-- Header -->
+  <header>
+    <div class="header-left">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="var(--accent)"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+      <span class="logo-name">Travel Planner</span>
+    </div>
+    <div class="header-right">
+      <div class="header-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-label" id="statusLabel">offline</span>
+      </div>
+      <button class="header-btn" onclick="clearThread()" title="New conversation">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <span>New chat</span>
+      </button>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="toggleSettings()" title="Settings" id="settingsBtn">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97 0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1 0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.58 1.69-.98l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64L19.43 12.97Z"/>
+          </svg>
+        </button>
+        <button class="icon-btn" onclick="logout()" title="Sign out" id="logoutBtn">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Messages -->
+  <div class="messages" id="messages">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" width="48" height="48" fill="var(--text3)"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+      </div>
+      <div class="empty-title">Where would you like to go?</div>
+      <div class="suggestions">
+        <div class="suggestion" onclick="fillSuggestion(this)">
+          <span class="suggestion-icon">✈️</span>
+          <span class="suggestion-text">Plan a weekend trip to Pokhara under 15k NPR</span>
+        </div>
+        <div class="suggestion" onclick="fillSuggestion(this)">
+          <span class="suggestion-icon">🌤️</span>
+          <span class="suggestion-text">What's the weather in Kathmandu this weekend?</span>
+        </div>
+        <div class="suggestion" onclick="fillSuggestion(this)">
+          <span class="suggestion-icon">📧</span>
+          <span class="suggestion-text">Email me a reminder to book the flight tomorrow at 10am</span>
+        </div>
+        <div class="suggestion" onclick="fillSuggestion(this)">
+          <span class="suggestion-icon">💰</span>
+          <span class="suggestion-text">Cheap travel options from Kathmandu to Chitwan</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <div class="input-wrap">
+      <textarea
+        id="input"
+        placeholder="Ask anything — travel, reminders, creative..."
+        rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Send">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+    <div class="input-hint">Enter to send · Shift+Enter for new line</div>
+  </div>
+
+</div>
+
+<!-- ── Settings Modal ──────────────────────────────────────────────── -->
+<div class="modal-overlay" id="settingsModal" style="display:none;" onclick="closeSettingsOutside(event)">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title">Settings</div>
+      <button class="modal-close" onclick="toggleSettings()">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Email Reminders</div>
+      <div class="settings-section-desc">
+        Set up email to send and receive reminders. You'll need a
+        <strong>Gmail App Password</strong> (not your regular password).
+      </div>
+
+      <div id="emailNotConfigured">
+        <div class="settings-steps">
+          <div class="settings-step">
+            <span class="step-num">1</span>
+            <div class="step-content">
+              <div class="step-title">Generate an App Password</div>
+              <div class="step-desc">Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">Google App Passwords</a>. Select "Mail" and click Generate. Copy the 16-character password.</div>
+            </div>
+          </div>
+          <div class="settings-step">
+            <span class="step-num">2</span>
+            <div class="step-content">
+              <div class="step-title">Enter below</div>
+              <div class="step-desc">Paste your email and the app password. This lets the agent send reminders on your behalf.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-form">
+          <div class="settings-field">
+            <label>Sending from</label>
+            <div class="settings-email-display" id="settingsAccountEmail">—</div>
+          </div>
+          <div class="settings-field">
+            <label for="smtpPassword">Gmail App Password (16 characters)</label>
+            <input type="password" id="smtpPassword" placeholder="xxxx xxxx xxxx xxxx" autocomplete="off">
+          </div>
+          <button class="settings-save-btn" onclick="saveEmailConfig()" id="emailSaveBtn">Save Email Settings</button>
+        </div>
+      </div>
+
+      <div id="emailConfigured" style="display:none;">
+        <div class="settings-connected-info">
+          <div class="settings-connected-badge">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            Connected
+          </div>
+          <div class="settings-field-hint" id="emailDisplay"></div>
+        </div>
+        <button class="settings-clear-btn" onclick="removeEmailConfig()">Remove</button>
+      </div>
+
+      <div class="settings-status" id="emailStatus"></div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">Account</div>
+      <div class="settings-field-hint" id="settingsUserEmail"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
