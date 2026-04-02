@@ -2,7 +2,7 @@ services:
   - type: web
     name: travel-planner-api
     runtime: docker
-    dockerfilePath: Dockerfile
+    dockerfilePath: ./Dockerfile
     dockerCommand: supervisord -c /app/supervisord.conf
     plan: free
     envVars:
