@@ -121,7 +121,7 @@ async def _execute_tool(tc: dict, tool_map: dict) -> ToolMessage:
 async def _react_loop(react_tools, tool_map, system_msg, conversation):
     """ReAct loop with streaming, retry logic, and model fallback."""
     accumulated = []
-    MAX_ITER = 3  # 1-2 tool rounds + 1 final response
+    MAX_ITER = 6  # Give model enough iterations for sequential tools
     cb = token_callback.get()
     # Groq primary (no retry), Groq fallback (no retry), OpenRouter last resort (retry)
     model_factories = [get_primary_llm, get_fallback1_llm, get_fallback2_llm]
@@ -262,10 +262,11 @@ async def travel_agent_node(state: AgentState) -> dict:
 
 
 def _extract_text(content) -> str:
+    import re
     if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "".join(
+        text = content
+    elif isinstance(content, list):
+        text = "".join(
             (
                 b.get("text", "")
                 if isinstance(b, dict)
@@ -273,7 +274,11 @@ def _extract_text(content) -> str:
             )
             for b in content
         )
-    return str(content)
+    else:
+        text = str(content)
+    
+    # Strip <think>...</think> tags which some OS models leak
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
 
 
 def _last_ai_text(messages: list) -> str | None:
