@@ -1,5 +1,7 @@
 // ── Config ────────────────────────────────────────────────────────────────
-const API_BASE = window.location.origin;
+// In production, set window.__API_BASE__ before loading this script,
+// or the API is on the same origin.
+const API_BASE = window.__API_BASE__ || window.location.origin;
 
 // ── State ─────────────────────────────────────────────────────────────────
 let threadId = null;

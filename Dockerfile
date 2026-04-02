@@ -11,9 +11,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e .
 
+# Install supervisord for production multi-process
+RUN pip install --no-cache-dir supervisor
+
 # Copy application code
 COPY . .
 
-# Default: run the API server. Override via docker-compose `command`.
-EXPOSE 8000
+# Ensure checkpoints directory exists
+RUN mkdir -p /app/checkpoints
+
+# Default: API only (local dev via docker-compose). Production uses supervisord.
+EXPOSE 8000 10000
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

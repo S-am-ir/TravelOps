@@ -1,4 +1,5 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from uuid import uuid4
 from typing import Optional
@@ -59,14 +60,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS: allow local dev + production frontend URL from env
+cors_origins = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+frontend_url = os.environ.get("FRONTEND_URL")
+if frontend_url:
+    cors_origins.append(frontend_url)
+# Allow all vercel.app subdomains for preview deployments
+cors_origins.append("https://*.vercel.app")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -29,9 +29,6 @@ class Settings(BaseSettings):
     # Web search
     tavily_api_key: Optional[SecretStr] = None
 
-    # Image generation
-    fal_api_key: Optional[SecretStr] = None
-
     # Auth
     jwt_secret: Optional[SecretStr] = None
 
