@@ -13,8 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e .
 
-# Install supervisord for production multi-process
-RUN pip install --no-cache-dir supervisor
 
 # Copy application code
 COPY . .

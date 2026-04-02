@@ -4,16 +4,7 @@ from typing import Optional
 
 
 class Settings(BaseSettings):
-    # MCP server ports
-    mcp_travel_port: int = 8001
-    mcp_comms_port: int = 8002
-    mcp_search_port: int = 8004
 
-    # MCP host
-    mcp_host: str = "127.0.0.1"
-    mcp_travel_host: Optional[str] = None
-    mcp_comms_host: Optional[str] = None
-    mcp_search_host: Optional[str] = None
 
     # Postgres checkpointer (Supabase connection string)
     supabase_url: Optional[SecretStr] = None
@@ -32,17 +23,7 @@ class Settings(BaseSettings):
     # Auth
     jwt_secret: Optional[SecretStr] = None
 
-    @property
-    def mcp_travel_resolved_host(self) -> str:
-        return self.mcp_travel_host or self.mcp_host
 
-    @property
-    def mcp_comms_resolved_host(self) -> str:
-        return self.mcp_comms_host or self.mcp_host
-
-    @property
-    def mcp_search_resolved_host(self) -> str:
-        return self.mcp_search_host or self.mcp_host
 
     model_config = SettingsConfigDict(
         env_file=".env",

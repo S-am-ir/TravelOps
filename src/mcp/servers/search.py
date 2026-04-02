@@ -18,17 +18,10 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp.server.fastmcp import FastMCP
+from langchain_core.tools import tool
 from pydantic import BaseModel
 from typing import Optional, List
 from src.config.settings import settings
-
-mcp = FastMCP(
-    "search",
-    host=settings.mcp_host,
-    port=settings.mcp_search_port,
-    json_response=True,
-)
 
 
 # ── Models ────────────────────────────────────────────────────────────────
@@ -65,7 +58,7 @@ def _get_tavily():
 # ── Web Search ────────────────────────────────────────────────────────────
 
 
-@mcp.tool()
+@tool
 async def web_search(
     query: str,
     max_results: int = 5,
@@ -143,7 +136,7 @@ async def web_search(
 # ── Multi-query Search ────────────────────────────────────────────────────
 
 
-@mcp.tool()
+@tool
 async def web_search_multi(
     queries: List[str],
     max_results_per_query: int = 3,
@@ -227,6 +220,4 @@ async def web_search_multi(
         )
 
 
-if __name__ == "__main__":
-    print(f"[MCP Search] running on {settings.mcp_host}:{settings.mcp_search_port}")
-    mcp.run(transport="streamable-http")
+

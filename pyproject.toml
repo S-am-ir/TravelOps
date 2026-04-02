@@ -13,12 +13,6 @@ dependencies = [
     "langchain-core>=0.3",
     "langchain-groq>=0.2",
     "langchain-openai>=0.2",
-    "langchain-mcp-adapters>=0.1",
-
-    # MCP server
-    "mcp[cli]>=1.0",
-    "fastmcp>=0.1",
-
     # API layer
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",

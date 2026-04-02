@@ -102,7 +102,14 @@ async def _execute_tool(tc: dict, tool_map: dict) -> ToolMessage:
 
     try:
         result = await tool.ainvoke(args)
-        content = json.dumps(result) if not isinstance(result, str) else result
+        if hasattr(result, "model_dump_json"):
+            content = result.model_dump_json()
+        elif hasattr(result, "json"):
+            content = result.json()
+        elif not isinstance(result, str):
+            content = json.dumps(result)
+        else:
+            content = result
         print(f"[Travel] tool OK: {name} → {len(content)} chars")
     except Exception as e:
         content = f"Tool error ({name}): {e}"

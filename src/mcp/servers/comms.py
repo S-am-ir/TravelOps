@@ -4,15 +4,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp.server.fastmcp import FastMCP
+from langchain_core.tools import tool
 from pydantic import BaseModel
 from typing import Optional
 from src.config.settings import settings
 import httpx
-
-mcp = FastMCP(
-    "comms", host=settings.mcp_host, port=settings.mcp_comms_port, json_response=True
-)
 
 
 class TelegramResult(BaseModel):
@@ -21,7 +17,7 @@ class TelegramResult(BaseModel):
     error: Optional[str] = None
 
 
-@mcp.tool()
+@tool
 async def send_telegram_message(
     body: str, chat_id: Optional[str] = None
 ) -> TelegramResult:
@@ -83,6 +79,4 @@ async def send_telegram_message(
             return TelegramResult(status="error", error=str(e))
 
 
-if __name__ == "__main__":
-    print(f"[MCP Comms] running on {settings.mcp_host}:{settings.mcp_comms_port}")
-    mcp.run(transport="streamable-http")
+

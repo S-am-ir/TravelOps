@@ -4,18 +4,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from mcp.server.fastmcp import FastMCP
+from langchain_core.tools import tool
 from pydantic import BaseModel
 from typing import Optional, List, Union
 from src.config.settings import settings
 import httpx
-
-mcp = FastMCP(
-    "travel",
-    host=settings.mcp_host,
-    port=settings.mcp_travel_port,
-    json_response=True,
-)
 
 
 # ── Weather ───────────────────────────────────────────────────────────────
@@ -35,7 +28,7 @@ class WeatherResult(BaseModel):
     error: Optional[str] = None
 
 
-@mcp.tool()
+@tool
 async def get_weather(city: str, days: Union[int, str] = 3) -> WeatherResult:
     """Get weather forecast for a city (use city name, not IATA code).
 
@@ -319,7 +312,7 @@ _NEPAL_DOMESTIC_FALLBACK = {
 }
 
 
-@mcp.tool()
+@tool
 async def search_flights(
     origin: str,
     destination: str,
@@ -400,7 +393,7 @@ class HotelResult(BaseModel):
     note: Optional[str] = None
 
 
-@mcp.tool()
+@tool
 async def search_hotels(
     city: str,
     checkin: str,
@@ -560,6 +553,4 @@ async def search_hotels(
     )
 
 
-if __name__ == "__main__":
-    print(f"[MCP Travel] running on {settings.mcp_host}:{settings.mcp_travel_port}")
-    mcp.run(transport="streamable-http")
+

@@ -4,7 +4,7 @@ services:
     runtime: docker
     dockerfilePath: Dockerfile
     dockerContext: .
-    dockerCommand: supervisord -c /app/supervisord.conf
+    dockerCommand: python -u -m uvicorn src.main:app --host 0.0.0.0 --port 10000
     plan: free
     envVars:
       - key: SUPABASE_URL
@@ -23,8 +23,7 @@ services:
         generateValue: true
       - key: FRONTEND_URL
         sync: false
-      - key: MCP_DIRECT
-        value: "true"
+
       - key: PYTHONUNBUFFERED
         value: "1"
     autoDeploy: false
