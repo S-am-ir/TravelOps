@@ -14,6 +14,7 @@ Split from the booking server (flights/hotels) so the agent can independently:
 
 import sys
 from pathlib import Path
+import asyncio
 
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -99,7 +100,8 @@ async def web_search(
 
     try:
         max_results = max(1, min(max_results, 10))
-        response = client.search(
+        response = await asyncio.to_thread(
+            client.search,
             query=query,
             max_results=max_results,
             search_depth=search_depth,
@@ -175,30 +177,39 @@ async def web_search_multi(
         seen_urls = set()
         answers = []
 
-        for q in queries:
+        async def fetch_query(q):
             try:
-                response = client.search(
+                return await asyncio.to_thread(
+                    client.search,
                     query=q,
                     max_results=max_results_per_query,
                     search_depth="basic",
                     include_answer=True,
                     include_raw_content=False,
                 )
-                if response.get("answer"):
-                    answers.append(response["answer"])
-                for r in response.get("results", []):
-                    url = r.get("url", "")
-                    if url not in seen_urls:
-                        seen_urls.add(url)
-                        all_results.append(
-                            SearchResult(
-                                title=r.get("title", ""),
-                                url=url,
-                                content=r.get("content", ""),
-                            )
-                        )
             except Exception as e:
                 print(f"[Search] query failed: {q}: {e}")
+                return None
+
+        tasks = [fetch_query(q) for q in queries]
+        responses = await asyncio.gather(*tasks)
+
+        for response in responses:
+            if not response:
+                continue
+            if response.get("answer"):
+                answers.append(response["answer"])
+            for r in response.get("results", []):
+                url = r.get("url", "")
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    all_results.append(
+                        SearchResult(
+                            title=r.get("title", ""),
+                            url=url,
+                            content=r.get("content", ""),
+                        )
+                    )
 
         combined_query = " | ".join(queries)
         combined_answer = " | ".join(answers) if answers else ""
