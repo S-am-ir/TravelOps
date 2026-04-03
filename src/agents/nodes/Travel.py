@@ -221,9 +221,10 @@ async def travel_agent_node(state: AgentState) -> dict:
     react_tools = [t for t in all_tools if t.name != "send_telegram_message"]
     tool_map = {t.name: t for t in all_tools}
 
-    system_msg = SystemMessage(
-        content=TRAVEL_SYSTEM.format(today=date.today().isoformat())
-    )
+    user_time = state.get("user_local_time")
+    if not user_time:
+        user_time = date.today().isoformat()
+    system_msg = SystemMessage(content=TRAVEL_SYSTEM.format(today=user_time))
     conversation = list(state.get("messages", []))
     # Filter: only keep HumanMessage and AIMessage (skip ToolMessages from previous turns)
     conversation = [

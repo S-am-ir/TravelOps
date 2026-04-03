@@ -20,6 +20,8 @@ class AgentState(TypedDict, total=False):
 
     # User context (passed from API layer)
     user_id: Optional[str]
+    user_timezone: Optional[str]
+    user_local_time: Optional[str]
 
 
 class IntentClassification(BaseModel):

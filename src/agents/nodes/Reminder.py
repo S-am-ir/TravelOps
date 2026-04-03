@@ -66,7 +66,8 @@ def _get_scheduler() -> AsyncIOScheduler:
 
 REMINDER_SYSTEM = """You are extracting reminder details from a user's message.
 
-Today (Nepal time): {today}
+Today (Local time): {today}
+User Timezone: {timezone}
 
 Extract:
 - reminder_message: concise text of what to remind about.
@@ -74,7 +75,7 @@ Extract:
   look back through the conversation history and summarise the key details
   (destination, dates, flights, hotel, budget, activities).
 - scheduled_for: ISO datetime (YYYY-MM-DDTHH:MM:SS) if a specific time was given,
-  or "now" for immediate send. Nepal is UTC+5:45.
+  or "now" for immediate send. Use the user's local timezone.
 - recipient_email: email address(es) to send to. If user mentions MULTIPLE emails,
   include ALL of them as comma-separated (e.g. "user1@gmail.com, user2@gmail.com").
   Null if not mentioned — it will go to the user's own email.
@@ -115,8 +116,9 @@ def _parse_tool_result(raw) -> dict:
 
 async def reminder_agent_node(state: AgentState) -> dict:
     messages = state.get("messages", [])
-    now_iso = datetime.now().strftime("%Y-%m-%d %H:%M")
-    system_msg = SystemMessage(content=REMINDER_SYSTEM.format(today=now_iso))
+    now_iso = state.get("user_local_time") or datetime.now().strftime("%Y-%m-%d %H:%M")
+    tz_info = state.get("user_timezone") or "UTC"
+    system_msg = SystemMessage(content=REMINDER_SYSTEM.format(today=now_iso, timezone=tz_info))
 
     try:
         extracted, model = await invoke_with_fallback(

@@ -298,10 +298,11 @@ async function sendMessage() {
   let fullContent = '';
 
   try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const res = await fetch(`${API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { ...authHeaders(), 'Accept': 'text/event-stream' },
-      body: JSON.stringify({ message: text, thread_id: threadId || undefined }),
+      body: JSON.stringify({ message: text, thread_id: threadId || undefined, timezone: tz }),
     });
 
     if (!res.ok) {
@@ -398,12 +399,14 @@ async function resolveHITL(confirmed) {
   let fullContent = '';
 
   try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const res = await fetch(`${API_BASE}/chat/stream`, {
       method: 'POST',
       headers: { ...authHeaders(), 'Accept': 'text/event-stream' },
       body: JSON.stringify({
         message: JSON.stringify({ confirmed }),
         thread_id: threadId,
+        timezone: tz
       }),
     });
 

@@ -88,6 +88,7 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
     thread_id: Optional[str] = None
+    timezone: Optional[str] = None
 
 
 class ChatResponse(BaseModel):
@@ -270,11 +271,23 @@ async def chat(
                 config=config,
             )
         else:
+            from datetime import datetime
+            local_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+            if request.timezone:
+                try:
+                    import zoneinfo
+                    tz = zoneinfo.ZoneInfo(request.timezone)
+                    local_time = datetime.now(tz).strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    pass
+
             input_state: dict = {
                 "messages": [
                     HumanMessage(content=request.message),
                 ],
                 "user_id": user.id if user else None,
+                "user_timezone": request.timezone,
+                "user_local_time": local_time,
             }
             result = await _agent.ainvoke(input_state, config=config)
 
@@ -371,9 +384,21 @@ async def chat_stream(
                         Command(resume=resume_value), config=config
                     )
                 else:
+                    from datetime import datetime
+                    local_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    if request.timezone:
+                        try:
+                            import zoneinfo
+                            tz = zoneinfo.ZoneInfo(request.timezone)
+                            local_time = datetime.now(tz).strftime("%Y-%m-%d %H:%M")
+                        except Exception:
+                            pass
+
                     input_state = {
                         "messages": [HumanMessage(content=request.message)],
                         "user_id": user.id if user else None,
+                        "user_timezone": request.timezone,
+                        "user_local_time": local_time,
                     }
                     result = await _agent.ainvoke(input_state, config=config)
                 await token_queue.put(("__DONE__", result))
