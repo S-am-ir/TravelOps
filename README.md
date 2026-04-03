@@ -6,6 +6,7 @@ An intelligent travel planning assistant powered by multi-agent architecture. Co
 
 - **Travel Planning** — Flights, hotels, weather, bus routes, budget planning with real-time data
 - **Email Reminders** — Schedule reminders sent via Gmail SMTP to any email address
+- **Conversational Generalist** — Intelligent handling of greetings, date/time, and general casual chat
 - **Real-time Web Search** — Tavily-powered search for places, transport, tips, currency rates
 - **Streaming Responses** — Token-by-token streaming via Server-Sent Events
 - **Persistent Conversations** — Postgres-backed memory with auth (JWT)
@@ -29,20 +30,22 @@ An intelligent travel planning assistant powered by multi-agent architecture. Co
 │                                                                     │
 │  classify_intent ──► travel_agent ──► END                           │
 │        │                reminder_agent ──► END                      │
-│        └──────────► unknown_handler ──► END                        │
+│        └──────────► general_agent ──► END                           │
 │                                                                     │
 │  ┌───────────────────────────────────────────────────────────────┐  │
-│  │ Travel Agent ReAct Loop (src/agents/nodes/Travel.py)          │  │
-│  │  • Streaming via astream + contextvar callback                │  │
-│  │  • 6-model fallback with retry (Groq → OpenRouter)            │  │
-│  │  • ToolMessages filtered from checkpointer (token savings)    │  │
+│  │     Tool Library (Native - src/mcp/servers/)                  │  │
+│  ├─────────────┬────────────────┬───────────────┬────────────────┤  │
+│  │   travel    │    search      │     comms     │    general     │  │
+│  │ (RapidAPI)  │   (Tavily)     │    (SMTP)     │   (No tools)   │  │
+│  └─────────────┴────────────────┴───────────────┴────────────────┘  │
+└─────────────────────────────────────────────────────────────────────┘inter (token savings)    │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │
           ┌────────────────┼────────────────┐
           ▼                ▼                ▼
   ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-  │ MCP: travel  │ │ MCP: search  │ │ MCP: comms   │
+  │ tool: travel | │ tool: search | │ tool : comms │
   │              │ │              │ │              │
   │ • get_weather│ │ • web_search │ │ • send_email │
   │ • search_    │ │ • web_search │ │              │
@@ -105,12 +108,7 @@ docker compose up -d
 # Install dependencies
 pip install -e .
 
-# Start MCP servers (each in a separate terminal)
-python src/mcp/servers/travel.py
-python src/mcp/servers/comms.py
-python src/mcp/servers/search.py
-
-# Start the API
+# Start the API (Tools are automatically imported natively)
 uvicorn src.main:app --reload
 ```
 
@@ -152,11 +150,8 @@ uvicorn src.main:app --reload
 
 | Service | Port | Description |
 |---------|------|-------------|
-| `api` | 8000 | FastAPI server + frontend |
-| `mcp-travel` | 8001 | Flight, hotel, weather tools |
-| `mcp-comms` | 8002 | Email sending tool |
-| `mcp-search` | 8004 | Tavily web search |
-| `postgres` | 5432 | PostgreSQL database |
+| `api` | 8000 | Main agent node, tool integration, and frontend |
+| `postgres` | 5432 | PostgreSQL database (Thread memory & Auth) |
 
 ## Project Structure
 
@@ -174,21 +169,17 @@ src/
 ├── agents/
 │   ├── state.py          # AgentState, IntentClassification, ReminderExtraction
 │   └── nodes/
-│       ├── Orchestrator.py  # Intent classification
+│       ├── Orchestrator.py  # Intent classification & General chat
 │       ├── Travel.py        # Travel agent with ReAct loop
 │       └── Reminder.py      # Email reminder scheduling
 ├── mcp/
-│   ├── client.py         # MCP tool client
-│   └── servers/
+│   └── servers/          # Native Tool Modules
 │       ├── travel.py     # Weather, flights, hotels
 │       ├── comms.py      # Email
-│       └── search.py     # Tavily web search
+│       └── search.py     # Tavily web search (optimized asyncio)
 frontend/
 ├── index.html            # Auth, chat, settings UI
 ├── js/app.js             # SSE streaming, auth flow
 └── css/styles.css        # Dark theme, responsive
 ```
 
-## License
-
-MIT

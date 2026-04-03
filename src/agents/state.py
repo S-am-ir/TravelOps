@@ -10,7 +10,7 @@ class AgentState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
 
     # Routing - set by classify_intent, re-evaluated each turn
-    intent: Literal["travel_planning", "reminder", "unknown"]
+    intent: Literal["travel_planning", "reminder", "general"]
 
     # Final response text (set by terminal node, read by API layer)
     final_response: str
@@ -27,7 +27,7 @@ class AgentState(TypedDict, total=False):
 class IntentClassification(BaseModel):
     """Structured output from intent classification LLM call."""
 
-    intent: Literal["travel_planning", "reminder", "unknown"]
+    intent: Literal["travel_planning", "reminder", "general"]
     confidence: float = Field(..., ge=0.0, le=1.0)
     reasoning: str = Field(..., description="Why this intent was chosen")
 

@@ -5,7 +5,7 @@ from src.config.settings import settings
 from src.agents.nodes.Orchestrator import (
     classify_intent_node,
     route_to_agent,
-    unknown_handler_node,
+    general_agent_node,
 )
 from src.agents.nodes.Travel import travel_agent_node
 from src.agents.nodes.Reminder import reminder_agent_node
@@ -52,7 +52,7 @@ def build_graph(checkpointer=None):
     graph.add_node("classify_intent", classify_intent_node)
     graph.add_node("travel_agent", _clean_node(travel_agent_node))
     graph.add_node("reminder_agent", _clean_node(reminder_agent_node))
-    graph.add_node("unknown_handler", unknown_handler_node)
+    graph.add_node("general_agent", general_agent_node)
 
     # Entry
     graph.set_entry_point("classify_intent")
@@ -64,12 +64,12 @@ def build_graph(checkpointer=None):
         {
             "travel_agent": "travel_agent",
             "reminder_agent": "reminder_agent",
-            "unknown_handler": "unknown_handler",
+            "general_agent": "general_agent",
         },
     )
 
     # Terminal edges
-    for node in ("travel_agent", "reminder_agent", "unknown_handler"):
+    for node in ("travel_agent", "reminder_agent", "general_agent"):
         graph.add_edge(node, END)
 
     return graph.compile(checkpointer=checkpointer)
