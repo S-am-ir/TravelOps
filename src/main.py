@@ -571,7 +571,7 @@ async def clear_thread(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "agent_ready": _agent is not None}
+    return "OK"
 
 
 # ── Frontend serving ────────────────────────────────────────────────────
