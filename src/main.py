@@ -590,7 +590,7 @@ if __name__ == "__main__":
 
     print("[DEBUG] Starting FastAPI server...")
     try:
-        uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+        uvicorn.run("main:app", host="127.0.0.1", port=8000)
     except Exception as e:
         print("[CRITICAL] Failed to start server:", str(e))
         raise
